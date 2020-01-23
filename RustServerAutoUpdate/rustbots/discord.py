@@ -4,18 +4,21 @@ import requests, json, sys, getopt
 
 class ServerInformation:
     def __init__(self, gameName, serverName, serverIP, serverHostName = ""):
+        """Information on the Server when sending message"""
         self.gameName = gameName
         self.serverName = serverName
         self.serverIP = serverIP
         self.serverHostName = serverHostName
 
 class DiscordBot:
-    """Send Message to Discord Server Using Webhook"""
+    """Bot to Send Message to Discord Server Using Webhook"""
     def __init__(self, webHook, botName, botAvatar = ""):
+        """Setup reusable bot information"""
         self.webHook = webHook
         self.botName = botName
         self.botAvatar = botAvatar
     def send_message(self, ServerInformation, message, title = "🚧 ALERT"):
+        """Send message and title to discord server"""
         headers = {"Content-Type" : "application/json"}
         jsonDict = {"username": self.botName,
                   "avatar_url": self.botAvatar,
@@ -112,5 +115,4 @@ def main(argv):
     reply = bot.send_message(sInfo, message, title)
     print(reply)
 if __name__ == "__main__":
-    #"Test webHook: https://discordapp.com/api/webhooks/280900899868639234/PDlN_4fHnMHhUnolguOR62Ms70IXjRl3Jjdy8SskObE6FA_BIAjpb_eB_C7_kdoDH1Rz"
    main(sys.argv[1:])

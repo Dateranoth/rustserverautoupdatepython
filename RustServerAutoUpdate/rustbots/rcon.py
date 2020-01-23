@@ -80,5 +80,4 @@ def main(argv):
     except _exceptions.WebSocketTimeoutException as err:
         print("Timed Out while waiting on response from server for command: " + command)
 if __name__ == "__main__":
-    #"Test password: abc123"
    main(sys.argv[1:])

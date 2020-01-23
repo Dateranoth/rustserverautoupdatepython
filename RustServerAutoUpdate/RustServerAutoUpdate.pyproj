@@ -22,6 +22,9 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="rustbots\oxide.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="rustbots\discord.py">
       <SubType>Code</SubType>
     </Compile>

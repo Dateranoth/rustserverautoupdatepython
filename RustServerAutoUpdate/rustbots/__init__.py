@@ -1,1 +1,1 @@
-import rustbots.discord, rustbots.rcon
+import rustbots.discord, rustbots.rcon, rustbots.oxide

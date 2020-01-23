@@ -338,3 +338,6 @@ ASALocalRun/
 
 # BeatPulse healthcheck temp database
 healthchecksdb
+/RustServerAutoUpdate/oxide_2020-01-20.txt
+/RustServerAutoUpdate/oxide_2020-01-21.txt
+/RustServerAutoUpdate/oxide_2022-01-21.txt

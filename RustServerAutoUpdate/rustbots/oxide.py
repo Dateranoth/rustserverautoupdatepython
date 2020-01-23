@@ -9,24 +9,39 @@ class UpdateCheck:
         self.oxideLogDir = os.path.join("", oxideLogDir)
         self.gitURL = gitURL
 
-    def get_git_api_json(self):
+    def get_json_from_api(self):
+        """Query Git API for json String with Latest Update Information"""
         r = requests.get(self.gitURL)
         if r.status_code == 200:
             return r.text
         else:
-            raise UpdaterError(str(r.status_code), r.text, "Response Status Code Failure")
+            raise UpdateCheckError(str(r.status_code), r.text, "Response Status Code Failure")
 
-    def get_latest_version(self):
+    def get_latest_version(self, gitJSONString = ""):
         """Get latest version from GitURL"""
-        r = requests.get(self.gitURL)
-        if r.status_code == 200:
-            reply = json.loads(r.text)
-            for x in reply:
-                if x == "tag_name":
-                    return reply[x]
-            raise UpdaterError(str(r.status_code), r.text, "Could Not Find tag_name")
-        else:
-            raise UpdaterError(str(r.status_code), r.text, "Response Status Code Failure")
+        if not gitJSONString.strip():
+            gitJSONString = self.get_json_from_api()
+        reply = json.loads(gitJSONString)
+        for x in reply:
+            if x == "tag_name":
+                return reply[x]
+        raise UpdateCheckError("200", gitJSONString, "Could Not Find tag_name")
+
+    def get_latest_url(self, linux = True,  gitJSONString = ""):
+        """Get latest linux version download url from GitURL. Optionally retrieve windows url instead of Linux"""
+        if not gitJSONString.strip():
+            gitJSONString = self.get_json_from_api()
+        reply = json.loads(gitJSONString)
+        for x in reply:
+            if x in "assets":
+                for a in reply[x]:
+                    for b in a:
+                        if b == "browser_download_url":
+                            if "linux" in a[b] and linux:
+                                return a[b]
+                            elif not "linux" in a[b] and not linux:
+                                return a[b]
+        raise UpdateCheckError("200", gitJSONString, "Could Not Find Download URL")
 
     def get_running_version(self):
         """Get running version from local logs"""
@@ -44,35 +59,18 @@ class UpdateCheck:
                             lastMatch = currentMatch[0]
         return lastMatch
 
-    def get_latest_url(self, linux = True):
-        """Get latest linux version download url from GitURL. Optionally retrieve windows url instead of Linux"""
-        r = requests.get(self.gitURL)
-        if r.status_code == 200:
-            reply = json.loads(r.text)
-            for x in reply:
-                if x in "assets":
-                    for a in reply[x]:
-                        for b in a:
-                            if b == "browser_download_url":
-                                if "linux" in a[b] and linux:
-                                    return a[b]
-                                elif not "linux" in a[b] and not linux:
-                                    return a[b]
-            raise UpdaterError(str(r.status_code), r.text, "Could Not Find Download URL")
-        else:
-            raise UpdaterError(str(r.status_code), r.text, "Response Status Code Failure")
-
     def check_update(self, linux = True):
         """Check for updates. Return tuple (Boolean update url, updatestring, runningversion, latestversion)"""
+        gitJSON = self.get_json_from_api()
         runningVersion = self.get_running_version()
-        latestVersion = self.get_latest_version()
-        if runningVersion.strip() != latestVersion.strip():
-            updateURL = self.get_latest_url(linux)
+        latestVersion = self.get_latest_version(gitJSON)
+        updateURL = self.get_latest_url(linux, gitJSON)
+        if runningVersion.strip() != latestVersion.strip():            
             return (True, updateURL, runningVersion, latestVersion)
         else:
-            return (False, '', runningVersion, latestVersion)
+            return (False, updateURL, runningVersion, latestVersion)
 
-class UpdaterError(Exception):
+class UpdateCheckError(Exception):
     def __init__(self, responsecode, detail, msg):
         self.response = responsecode
         self.text = detail

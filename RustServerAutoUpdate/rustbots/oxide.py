@@ -60,7 +60,7 @@ class UpdateCheck:
         return lastMatch
 
     def check_update(self, linux = True):
-        """Check for updates. Return tuple (Boolean update url, updatestring, runningversion, latestversion)"""
+        """Check for updates. Return tuple (Boolean update required, String update url, String runningversion, String latestversion)"""
         gitJSON = self.get_json_from_api()
         runningVersion = self.get_running_version()
         latestVersion = self.get_latest_version(gitJSON)

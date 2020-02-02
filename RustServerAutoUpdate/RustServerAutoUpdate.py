@@ -1,15 +1,17 @@
-import sys, getopt, re, glob, os.path, configparser
+import sys, signal, getopt, re, glob, os.path, configparser
 from rustbots import discord, rcon, oxide
 from collections import OrderedDict
+from time import sleep
+from subprocess import run
 
 class RustMonitor:
     def __init__(self, configPath = '', configSection = 'SERVER1'):
         configSectionUpper = configSection.upper()
-        self.setupConfiguration(configPath, configSectionUpper)
+        self.setup_configuration(configPath, configSectionUpper)
         confsec = self.config[configSectionUpper]
         self.oxideLogDIR = confsec['oxide_log_dir']
         self.oxideGitURL = confsec['oxide_git_url']
-        self.oxideCheckTime = confsec['oxide_check_time_in_min']
+        self.oxideCheckTime = self.config.getfloat(configSectionUpper, 'oxide_check_time_in_min')
         self.oxideAutoUpdate = self.config.getboolean(configSectionUpper, 'oxide_auto_update')
         self.bashCommand = confsec['bash_get_update_command']
         self.useRCON =  self.config.getboolean(configSectionUpper, 'use_rcon')
@@ -33,9 +35,10 @@ class RustMonitor:
         self.msg10Min = confsec['10min_msg']
         self.msg05Min = confsec['5min_msg']
         self.msg01Min = confsec['1min_msg']
+
         #To preserve comments. Load defaults first, then load user values. Then write file. Then read file directly again without allow_no_value to have clean input to work with.
         #subprocess.run for running shell commands
-    def setupConfiguration(self, configPath, configSection):
+    def setup_configuration(self, configPath, configSection):
         """Read INI file and update with new options if necessary"""
         confComments = OrderedDict({'DEFAULT': {'# This is the Default configuration.': None,
                                                 '# These settings apply to all instances.': None,
@@ -101,9 +104,112 @@ class RustMonitor:
         self.config.read_dict(confDefaults)
         self.config.read(configFile, encoding='utf-8')
 
-#sin = discord.ServerInformation("myGame", "MyServer", "1.1.1.1", "gamercide.org")
-#bot = discord.DiscordBot("https://discordapp.com/api/webhooks/280900899868639234/PDlN_4fHnMHhUnolguOR62Ms70IXjRl3Jjdy8SskObE6FA_BIAjpb_eB_C7_kdoDH1Rz", "Botty")
-#bot.send_message(sin, "Test from inside Visual Studio")
+    def check_variables(self, case):
+        if case == 1:
+            if not self.discordWebHook.strip():
+                raise RustMonitorVariableError('discord_webhook', 'Discord Bot is enabled, but no webHook was provided.')
+            else:
+                self.disdiscordWebHook = self.discordWebHook.strip()
+            if not self.discordBotName.strip():
+                self.discordBotName = 'Unknown Bot'
+            if not self.discordBotAvatarURL.strip():
+                self.discordBotAvatarURL = ""
+            if not self.discordMsgGameName.strip():
+                self.discordMsgGameName = 'Unkown Game'
+            if not self.discordMsgServerName.strip():
+                self.discordMsgServerName = 'Unknown Server'
+            if not self.discordMsgServerIP.strip():
+                self.discordMsgServerIP = '127.0.0.1'
+            if not self.discordMsgHostName.strip():
+                self.discordMsgHostName = ""
+        elif case == 2:
+            if not self.rconIP.strip():
+                raise RustMonitorVariableError('rcon_ip', 'RCON is Enabled, but no IP was provided')
+            else:
+                self.rconIP = self.rconIP.strip()
+            if not self.rconPort.strip():
+                raise RustMonitorVariableError('rcon_port', 'RCON is Enabled, but no Port was provided')
+            else:
+                self.rconPort = self.rconPort.strip()
+            if not self.rconPass.strip():
+                raise RustMonitorVariableError('rcon_pass', 'RCON is Enabled, but no Password was provided')
+            else:
+                self.rconPass = self.rconPass.strip()
+            if not self.rconBotName.strip():
+                self.discordBotName = 'Unknown Bot'
+    def send_msgs(self, msg):
+        #TODO: Add logging to exception messages.
+        if self.useDiscord:
+            try:
+                self.discordBot.send_message(self.serverinfo, msg, self.discordMsgTitle)
+            except Exception as ex:
+                print(ex)
+        if self.useRCON:
+            try:
+                self.rconBot.send_message('say ' + msg)
+            except Exception as ex:
+                print(ex)
+    def update_loop(self):
+        self.stop = False
+        while not self.stop:
+            response = self.oxideBot.check_update()
+            if response[0]:
+                if self.send15MinWarn:
+                    self.send_msgs(self.msg15Min)
+                    if self.send10MinWarn:
+                        sleep(5*60)
+                    elif self.send05MinWarn:
+                        sleep(10*60)
+                    elif self.send01MinWarn:
+                        sleep(14*60)
+                if self.send10MinWarn:
+                    self.send_msgs(self.msg10Min)
+                    if self.send05MinWarn:
+                        sleep(5*60)
+                    elif self.send01MinWarn:
+                        sleep(9*60)
+                if self.send05MinWarn:
+                    self.send_msgs(self.msg05Min)
+                    if self.send01MinWarn:
+                        sleep(4*60)
+                if self.send01MinWarn:
+                    self.send_msgs(self.msg01Min)
+                    sleep(1*60)
+                if self.oxideAutoUpdate:
+                    run(self.bashCommand, shell=True, universal_newlines=True)
+            sleep(self.oxideCheckTime * 60)
 
-#rconbot = rcon.RCONBot("abc123", "127.0.0.1", "28016", "Botty")
-#rconbot.send_message("say This is a Test from a New bot")
+    def main(self):
+        if not self.oxideAutoUpdate and not self.useDiscord and not self.useRCON:
+            raise RustMonitorVariableError('oxide_auto_update', 'Oxide Auto Update, Discord, and RCON are all disabled. There is nothing for this program to do.')
+        if self.useDiscord:
+            self.check_variables(1)
+            self.serverinfo = discord.ServerInformation(self.discordMsgGameName, self.discordMsgServerName, self.discordMsgServerIP, self.discordMsgHostName)
+            self.discordBot = discord.DiscordBot(self.discordWebHook, self.discordBotName, self.discordBotAvatarURL)
+        if self.useRCON:
+            self.rconBotName = self.discordBotName
+            self.check_variables(2)
+            self.rconBot = rcon.RCONBot(self.rconPass, self.rconIP, self.rconPort, self.rconBotName)
+        self.oxideBot = oxide.UpdateCheck(self.oxideLogDIR, self.oxideGitURL)
+        try:
+            self.update_loop()
+        except GracefulExit:
+            self.stop = True
+
+class RustMonitorVariableError(Exception):
+    def __init__(self, variable, msg):
+        self.variable = variable
+        self.msg = msg
+
+class GracefulExit(Exception):
+    pass
+
+def signal_handler(signum, frame):
+    print("\nStopping Rust Server Auto Update")
+    raise GracefulExit()
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    rm = RustMonitor('')
+    rm.main()

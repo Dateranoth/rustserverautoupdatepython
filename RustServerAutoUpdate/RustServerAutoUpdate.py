@@ -1,8 +1,10 @@
-import sys, signal, getopt, re, glob, os.path, configparser
+import sys, signal, getopt, re, glob, os.path, configparser, asyncio
 from rustbots import discord, rcon, oxide
 from collections import OrderedDict
 from time import sleep
 from subprocess import run
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 class RustMonitor:
     def __init__(self, configPath = '', configSection = 'SERVER1'):
@@ -149,35 +151,41 @@ class RustMonitor:
                 self.rconBot.send_message('say ' + msg)
             except Exception as ex:
                 print(ex)
-    def update_loop(self):
+    async def update_loop(self):
         self.stop = False
         while not self.stop:
             response = self.oxideBot.check_update()
+            sleepMultiplier = 1
             if response[0]:
                 if self.send15MinWarn:
-                    self.send_msgs(self.msg15Min)
+                    with ThreadPoolExecutor() as executor:
+                        await self.loop.run_in_executor(executor, self.send_msgs, self.msg15Min)                
                     if self.send10MinWarn:
-                        sleep(5*60)
+                        await asyncio.sleep(5*sleepMultiplier)
                     elif self.send05MinWarn:
-                        sleep(10*60)
+                        await asyncio.sleep(10*sleepMultiplier)
                     elif self.send01MinWarn:
-                        sleep(14*60)
+                        await asncio.sleep(14*sleepMultiplier)
                 if self.send10MinWarn:
-                    self.send_msgs(self.msg10Min)
+                    with ThreadPoolExecutor() as executor:
+                        await self.loop.run_in_executor(executor, self.send_msgs,self.msg10Min)
                     if self.send05MinWarn:
-                        sleep(5*60)
+                        await asyncio.sleep(5*sleepMultiplier)
                     elif self.send01MinWarn:
-                        sleep(9*60)
+                        await asyncio.sleep(9*sleepMultiplier)
                 if self.send05MinWarn:
-                    self.send_msgs(self.msg05Min)
+                    with ThreadPoolExecutor() as executor:
+                        await self.loop.run_in_executor(executor, self.send_msgs, self.msg05Min)
                     if self.send01MinWarn:
-                        sleep(4*60)
+                        await asyncio.sleep(4*sleepMultiplier)
                 if self.send01MinWarn:
-                    self.send_msgs(self.msg01Min)
-                    sleep(1*60)
+                    with ThreadPoolExecutor() as executor:
+                        await self.loop.run_in_executor(executor, self.send_msgs, self.msg01Min)
+                    await asyncio.sleep(1*sleepMultiplier)
                 if self.oxideAutoUpdate:
-                    run(self.bashCommand, shell=True, universal_newlines=True)
-            sleep(self.oxideCheckTime * 60)
+                    with ThreadPoolExecutor() as executor:
+                        await self.loop.run_in_executor(executor, partial(run, self.bashCommand, shell=True, universal_newlines=True))
+            await asyncio.sleep(self.oxideCheckTime * sleepMultiplier)
 
     def main(self):
         if not self.oxideAutoUpdate and not self.useDiscord and not self.useRCON:
@@ -191,10 +199,15 @@ class RustMonitor:
             self.check_variables(2)
             self.rconBot = rcon.RCONBot(self.rconPass, self.rconIP, self.rconPort, self.rconBotName)
         self.oxideBot = oxide.UpdateCheck(self.oxideLogDIR, self.oxideGitURL)
+        self.loop = asyncio.get_event_loop()
+        tasks = asyncio.gather(self.update_loop())
         try:
-            self.update_loop()
+            self.loop.run_until_complete(tasks)
         except GracefulExit:
             self.stop = True
+            tasks.cancel()
+            self.loop.run_forever()
+            tasks.exception()
 
 class RustMonitorVariableError(Exception):
     def __init__(self, variable, msg):

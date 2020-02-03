@@ -45,7 +45,6 @@ class UpdateCheck:
 
     def get_running_version(self):
         """Get running version from local logs"""
-        #pattern = "(Loaded extension Rust v)([0-9]\.[0-9]\.(\d+))"
         pattern = "Loaded extension Rust v(\d+\.\d+\.\d+)"
         lastMatch = '0.0.0'
         logFileNameList = glob.glob(os.path.join(self.oxideLogDir, 'oxide*.txt'))        

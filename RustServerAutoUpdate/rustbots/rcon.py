@@ -12,6 +12,10 @@ class RCONBot:
         self.botName = botName
 
     def send_message(self, command, identifier = "-1", timeout = 10):
+        """Send Message to Rust RCON. Return reply from server.
+           Example send_message('say Welcome to my Server')
+           Optionally send identifer and timeout. Identifier is a return for
+           certain commands to allow tracking. Timeout is how long to wait for reply."""
         jsonDict = {"Identifier": identifier,
                    "Message": command,
                    "Name": self.botName}

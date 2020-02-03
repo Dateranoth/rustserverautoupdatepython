@@ -4,7 +4,9 @@ import requests, json, sys, getopt
 
 class ServerInformation:
     def __init__(self, gameName, serverName, serverIP, serverHostName = ""):
-        """Information on the Server when sending message"""
+        """Information on the Server when sending message
+           These items can all be empty strings, but they provide
+           detailed information about the server for display on Discord."""
         self.gameName = gameName
         self.serverName = serverName
         self.serverIP = serverIP
@@ -13,12 +15,18 @@ class ServerInformation:
 class DiscordBot:
     """Bot to Send Message to Discord Server Using Webhook"""
     def __init__(self, webHook, botName, botAvatar = ""):
-        """Setup reusable bot information"""
+        """Setup reusable bot information
+        webHook from Discord Bot Setup. Should be URL.
+        botName is not required, but will be displayed as user on Discord.
+        botAvatar allows custom user icon to be displayed. URL."""
         self.webHook = webHook
         self.botName = botName
         self.botAvatar = botAvatar
     def send_message(self, ServerInformation, message, title = "🚧 ALERT"):
-        """Send message and title to discord server"""
+        """Send message and title to discord server
+        ServerInformation comes from class and is required.
+        message is what should be said by discord bot.
+        title can be anything, but is used as an indicator for type of message."""
         headers = {"Content-Type" : "application/json"}
         jsonDict = {"username": self.botName,
                   "avatar_url": self.botAvatar,

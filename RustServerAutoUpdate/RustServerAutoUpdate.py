@@ -38,8 +38,6 @@ class RustMonitor:
         self.msg05Min = confsec['5min_msg']
         self.msg01Min = confsec['1min_msg']
 
-        #To preserve comments. Load defaults first, then load user values. Then write file. Then read file directly again without allow_no_value to have clean input to work with.
-        #subprocess.run for running shell commands
     def setup_configuration(self, configPath, configSection):
         """Read INI file and update with new options if necessary"""
         confComments = OrderedDict({'DEFAULT': {'# This is the Default configuration.': None,
@@ -52,9 +50,9 @@ class RustMonitor:
                                                 'oxide_git_url': 'https://api.github.com/repositories/94599577/releases/latest',
                                                 'oxide_check_time_in_min': '15',
                                                 'oxide_auto_update': 'yes',
-                                                'bash_get_update_command': '~/./rustserver stop | ~/./rustserver mods-update',
+                                                'bash_get_update_command': '~/./rustserver stop | ~/./rustserver mods-update | ~/./rustserver start',
                                                 'use_rcon': 'yes',
-                                                'use_discord': 'yes',
+                                                'use_discord': 'no',
                                                 'rcon_ip': '127.0.0.1',
                                                 'rcon_port': '28016',
                                                 'rcon_pass': 'CHANGE_ME',
@@ -107,6 +105,8 @@ class RustMonitor:
         self.config.read(configFile, encoding='utf-8')
 
     def check_variables(self, case):
+        """Check variables to confirm they will not cause errors.
+           Fill in generic defaults if non-required variables are empty."""
         if case == 1:
             if not self.discordWebHook.strip():
                 raise RustMonitorVariableError('discord_webhook', 'Discord Bot is enabled, but no webHook was provided.')
@@ -140,6 +140,7 @@ class RustMonitor:
             if not self.rconBotName.strip():
                 self.discordBotName = 'Unknown Bot'
     def send_msgs(self, msg):
+        """Containted method to send messages to both discord and RCON"""
         #TODO: Add logging to exception messages.
         if self.useDiscord:
             try:
@@ -155,7 +156,7 @@ class RustMonitor:
         self.stop = False
         while not self.stop:
             response = self.oxideBot.check_update()
-            sleepMultiplier = 1
+            sleepMultiplier = 60
             if response[0]:
                 if self.send15MinWarn:
                     with ThreadPoolExecutor() as executor:
@@ -221,8 +222,40 @@ def signal_handler(signum, frame):
     print("\nStopping Rust Server Auto Update")
     raise GracefulExit()
 
-if __name__ == "__main__":
+def argumenthelp():
+    print("\nSyntax: rustserverautoupdate.py -c <Path to Configuration INI> [-s <Section Name - Used for multiple instances>]\n"
+          "Example: rustserverautoupdate.py -c \home\rustserver\rustserverautoupdate -s SERVER1\n"
+          "\n"
+          "Check for updates. Return Space Separated String Array (Boolean update url, updatestring, runningversion, latestversion)\n\n"
+          "REQUIRED INPUT - CHOOSE ONE:\n"
+          "-c --configpath   Path where Configuration File is Stored. MUST HAVE R.\n"
+          "OPTIONAL INPUT:\n"          
+          "-s --section       Section Name for configuration. This allows for multiple instances to be ran from same configuration.\n")
+def main(argv):
+    configPath = ""
+    sectionName = ""
+    try:
+        opts, args = getopt.getopt(argv,"hc:s:",["help", "configpath=", "section="])
+    except getopt.GetoptError as err:
+        print("Incorrect Syntax: -h or --help for more information")
+        print("rustserverautoupdate.py -c <Path to Configuration INI> [-s <Section Name - Used for multiple instances>]\n")
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt in ("-h", "--help"):
+            argumenthelp()
+            sys.exit()
+        elif opt in ("-c", "--configpath"):
+            configPath = arg
+        elif opt in ("-s", "--section"):
+            sectionName = arg
+    if not configPath.strip():
+        configPath = configPath.strip()
+    if not sectionName.strip():
+        sectionName = "SERVER1"
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
     rm = RustMonitor('')
     rm.main()
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

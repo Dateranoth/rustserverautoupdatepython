@@ -8,8 +8,6 @@ verify_ssl = true
 [packages]
 requests = "*"
 websockets = "*"
-websocket-client = "*"
-timeloop = "*"
 
 [requires]
 python_version = "3.7"

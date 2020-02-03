@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>760be93c-44b6-486f-8e5d-c6a64c5224ff</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>RustServerAutoUpdate.py</StartupFile>
+    <StartupFile>rustserverautoupdate.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -34,7 +34,10 @@
     <Compile Include="rustbots\__init__.py">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="RustServerAutoUpdate.py" />
+    <Compile Include="rustserverautoupdate.py" />
+    <Compile Include="setup.py">
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <Interpreter Include="..\..\..\..\..\.virtualenvs\RustServerAutoUpdate-WMf8rdv8\">
@@ -49,6 +52,10 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="rustbots\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="LICENSE.txt" />
+    <Content Include="README.md" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

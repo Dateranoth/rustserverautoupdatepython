@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import sys, signal, getopt, re, glob, os.path, configparser, asyncio
 from rustbots import discord, rcon, oxide
 from collections import OrderedDict

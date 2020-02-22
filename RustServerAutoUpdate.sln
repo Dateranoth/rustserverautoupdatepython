@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29709.97
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "RustServerAutoUpdate", "RustServerAutoUpdate\RustServerAutoUpdate.pyproj", "{760BE93C-44B6-486F-8E5D-C6A64C5224FF}"
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "RustServerAutoUpdate", "RustServerAutoUpdate\rustserverautoupdate.pyproj", "{760BE93C-44B6-486F-8E5D-C6A64C5224FF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

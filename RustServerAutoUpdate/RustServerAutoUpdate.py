@@ -234,7 +234,7 @@ def argumenthelp():
           "OPTIONAL INPUT:\n"          
           "-s --section       Section Name for configuration. This allows for multiple instances to be ran from same configuration.\n")
 def main(argv):
-    configPath = ""
+    configPath = os.path.dirname(os.path.realpath(__file__))
     sectionName = ""
     try:
         opts, args = getopt.getopt(argv,"hc:s:",["help", "configpath=", "section="])

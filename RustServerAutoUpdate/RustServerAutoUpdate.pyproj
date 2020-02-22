@@ -3,13 +3,14 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>760be93c-44b6-486f-8e5d-c6a64c5224ff</ProjectGuid>
-    <ProjectHome>.</ProjectHome>
+    <ProjectHome>
+    </ProjectHome>
     <StartupFile>rustserverautoupdate.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
-    <Name>RustServerAutoUpdate</Name>
+    <Name>rustserverautoupdate</Name>
     <RootNamespace>RustServerAutoUpdate</RootNamespace>
     <InterpreterId>MSBuild|RustServerAutoUpdate-WMf8rdv8|$(MSBuildProjectFullPath)</InterpreterId>
   </PropertyGroup>

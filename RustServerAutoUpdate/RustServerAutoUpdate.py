@@ -7,6 +7,7 @@ from time import sleep
 from subprocess import run
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
+from datetime import datetime, timedelta, timezone
 
 class RustMonitor:
     def __init__(self, configPath = '', configSection = 'SERVER1'):
@@ -48,11 +49,11 @@ class RustMonitor:
                                                 '# Copy to appropriate section below and update as necessary.': None,
                                                 '# Individual instance settings will override defaults.': None},
                                     configSection   : {'# Enter '+ configSection +' Settings Here.': None}})
-        confDefaults = OrderedDict({'DEFAULT': {'oxide_log_dir':  '~/serverfiles/oxide/logs',
+        confDefaults = OrderedDict({'DEFAULT': {'oxide_log_dir':  '/home/rustserver/serverfiles/oxide/logs',
                                                 'oxide_git_url': 'https://api.github.com/repositories/94599577/releases/latest',
                                                 'oxide_check_time_in_min': '15',
                                                 'oxide_auto_update': 'yes',
-                                                'bash_get_update_command': '~/./rustserver stop | ~/./rustserver mods-update | ~/./rustserver start',
+                                                'bash_get_update_command': '/home/rustserver/./rustserver stop;/home/rustserver/./rustserver update;/home/rustserver/./rustserver mods-update;/home/rustserver/./rustserver start',
                                                 'use_rcon': 'yes',
                                                 'use_discord': 'no',
                                                 'rcon_ip': '127.0.0.1',
@@ -156,39 +157,84 @@ class RustMonitor:
                 print(ex)
     async def update_loop(self):
         self.stop = False
+        timeZN = timezone(timedelta(hours=0))
+        loopCycleTime = timedelta(minutes=self.oxideCheckTime)
+        loopStartTime = datetime.now(timeZN)
+        loopStart = True
+        updateNeeded = False
         while not self.stop:
-            response = self.oxideBot.check_update()
-            sleepMultiplier = 60
-            if response[0]:
-                if self.send15MinWarn:
+            if ((datetime.now(timeZN) >= (loopStartTime + loopCycleTime)) or loopStart) and not updateNeeded:
+                response = self.oxideBot.check_update()
+                if response[0]:
+                    print("Found New Version: " + response[3] + " Old Version: " + response[2])
+                    updateNeeded = True
+                else:
+                    #self.send_msgs("Oxide Up to Date: " + response[2])
+                    print("Oxide Up to Date: " + response[2])
+                loopStartTime = datetime.now(timeZN)
+                messageWaitTime = timedelta(minutes=0)
+            if updateNeeded and not loopStart:
+                if send15 and (datetime.now(timeZN) >= (loopStartTime + messageWaitTime)):
+                    print("Sending 15 Minute Warning")
                     with ThreadPoolExecutor() as executor:
-                        await self.loop.run_in_executor(executor, self.send_msgs, self.msg15Min)                
-                    if self.send10MinWarn:
-                        await asyncio.sleep(5*sleepMultiplier)
-                    elif self.send05MinWarn:
-                        await asyncio.sleep(10*sleepMultiplier)
-                    elif self.send01MinWarn:
-                        await asncio.sleep(14*sleepMultiplier)
-                if self.send10MinWarn:
+                        await self.loop.run_in_executor(executor, self.send_msgs, self.msg15Min)
+                    send15 = False
+                    loopStartTime = datetime.now(timeZN)
+                    messageWaitTime = timedelta(minutes=15)
+                elif send10 and (datetime.now(timeZN) >= (loopStartTime + (messageWaitTime - timedelta(minutes=10)))):
+                    print("Sending 10 Minute Warning")
                     with ThreadPoolExecutor() as executor:
                         await self.loop.run_in_executor(executor, self.send_msgs,self.msg10Min)
-                    if self.send05MinWarn:
-                        await asyncio.sleep(5*sleepMultiplier)
-                    elif self.send01MinWarn:
-                        await asyncio.sleep(9*sleepMultiplier)
-                if self.send05MinWarn:
+                    send10 = False
+                    loopStartTime = datetime.now(timeZN)
+                    messageWaitTime = timedelta(minutes=10)
+                elif send05 and (datetime.now(timeZN)  >= (loopStartTime + (messageWaitTime - timedelta(minutes=5)))):
+                    print("Sending 5 Minute Warning")
                     with ThreadPoolExecutor() as executor:
                         await self.loop.run_in_executor(executor, self.send_msgs, self.msg05Min)
-                    if self.send01MinWarn:
-                        await asyncio.sleep(4*sleepMultiplier)
-                if self.send01MinWarn:
+                    send05 = False
+                    loopStartTime = datetime.now(timeZN)
+                    messageWaitTime = timedelta(minutes=5)
+                elif send01 and (datetime.now(timeZN)  >= (loopStartTime + (messageWaitTime - timedelta(minutes=1)))):
+                    print("Sending 1 Minute Warning")
                     with ThreadPoolExecutor() as executor:
                         await self.loop.run_in_executor(executor, self.send_msgs, self.msg01Min)
-                    await asyncio.sleep(1*sleepMultiplier)
-                if self.oxideAutoUpdate:
+                    send01 = False
+                    loopStartTime = datetime.now(timeZN)
+                    messageWaitTime = timedelta(minutes=1)
+                elif autoUpdate and (datetime.now(timeZN) >= (loopStartTime + messageWaitTime)) and not (send01 or send05 or send10 or send15):
+                    print("Updating Oxide")
                     with ThreadPoolExecutor() as executor:
+                        print(self.bashCommand)
                         await self.loop.run_in_executor(executor, partial(run, self.bashCommand, shell=True, universal_newlines=True))
-            await asyncio.sleep(self.oxideCheckTime * sleepMultiplier)
+                    autoUpdate = False
+                elif not (send01 or send05 or send10 or send15 or autoUpdate):
+                    print("Reset Update Check")
+                    updateNeeded = False
+                    loopStartTime = datetime.now(timeZN)
+            else:
+                if self.send15MinWarn:
+                    send15 = True
+                else:
+                    send15 = False
+                if self.send10MinWarn:
+                    send10 = True
+                else:
+                    send10 = False
+                if self.send05MinWarn:
+                    send05 = True
+                else:
+                    send05 = False
+                if self.send01MinWarn:
+                    send01 = True
+                else:
+                    send01 = False
+                if self.oxideAutoUpdate:
+                    autoUpdate = True
+                else:
+                    autoUpdate = False
+            loopStart = False
+            await asyncio.sleep(1)
 
     def main(self):
         if not self.oxideAutoUpdate and not self.useDiscord and not self.useRCON:
@@ -208,8 +254,10 @@ class RustMonitor:
             self.loop.run_until_complete(tasks)
         except GracefulExit:
             self.stop = True
+            tasks.add_done_callback(lambda t: self.loop.stop())
             tasks.cancel()
-            self.loop.run_forever()
+            while not tasks.done() and not self.loop.is_closed():
+                self.loop.run_forever()
             tasks.exception()
 
 class RustMonitorVariableError(Exception):

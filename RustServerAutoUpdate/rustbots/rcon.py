@@ -19,10 +19,10 @@ class RCONBot:
         jsonDict = {"Identifier": identifier,
                    "Message": command,
                    "Name": self.botName}
-        ws = create_connection("ws://" + self.ip + ":" + self.port + "/" + self.password)
+        ws = create_connection("ws://" + self.ip + ":" + self.port + "/" + self.password, timeout)
         ws.send(json.dumps(jsonDict))
-        ws.settimeout(timeout)
         reply = json.loads(ws.recv())
+        ws.close()
         return reply
 
 def argumenthelp():

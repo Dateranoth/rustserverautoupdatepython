@@ -304,7 +304,7 @@ def main(argv):
         sectionName = "SERVER1"
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
-    rm = RustMonitor('')
+    rm = RustMonitor(configPath,sectionName)
     rm.main()
 
 if __name__ == "__main__":

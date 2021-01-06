@@ -22,7 +22,7 @@ class RCONBot:
         ws = create_connection("ws://" + self.ip + ":" + self.port + "/" + self.password, timeout)
         ws.send(json.dumps(jsonDict))
         reply = json.loads(ws.recv())
-        ws.close()
+        ws.close(timeout=.05)
         return reply
 
 def argumenthelp():

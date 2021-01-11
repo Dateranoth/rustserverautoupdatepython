@@ -155,6 +155,15 @@ class RustMonitor:
                 self.rconBot.send_message('say ' + msg)
             except Exception as ex:
                 print(ex)
+    def kick_save(self):
+        """Containted method to kick players and save before restart."""
+        #TODO: Add logging to exception messages.
+        if self.useRCON:
+            try:
+                self.rconBot.send_message('kickall "" "Server Restarting"')
+                self.rconBot.send_message('server.save')
+            except Exception as ex:
+                print(ex)
     async def update_loop(self):
         self.stop = False
         timeZN = timezone(timedelta(hours=0))
@@ -206,12 +215,16 @@ class RustMonitor:
                     print("Updating Oxide")
                     with ThreadPoolExecutor() as executor:
                         print(self.bashCommand)
-                        await self.loop.run_in_executor(executor, partial(run, self.bashCommand, shell=True, universal_newlines=True))
+                        await self.loop.run_in_executor(executor, self.kick_save)
+                        await self.loop.run_in_executor(executor, partial(run, self.bashCommand, shell=True, universal_newlines=True))                    
                     autoUpdate = False
                 elif not (send01 or send05 or send10 or send15 or autoUpdate):
                     print("Reset Update Check")
                     updateNeeded = False
-                    loopStartTime = datetime.now(timeZN)
+                    #Using LinuxGSM the shell will return and the game starts up in a separate thread. Need to wait for the game to start so that the logs load.
+                    #Could probably do this a different way, but for now, I think this is the best option. 
+                    #It's unlikely another update would come through in 20 minutes. So this will be 20 minutes + the delay set by the user.
+                    loopStartTime = datetime.now(timeZN) + timedelta(minutes=20)
             else:
                 if self.send15MinWarn:
                     send15 = True

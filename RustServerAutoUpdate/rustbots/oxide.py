@@ -49,6 +49,15 @@ class UpdateCheck:
         lastMatch = '0.0.0'
         logFileNameList = glob.glob(os.path.join(self.oxideLogDir, 'oxide*.txt'))        
         if len(logFileNameList) != 0:
+            #Log file rolls over nightly. Need to check the second to last file first to make sure we don't miss the version.
+            if len(logFileNameList) >= 2:
+                logSecondLatestFileName = logFileNameList[-2]
+                with open(logSecondLatestFileName) as rustLogFile:
+                    for currentLine in rustLogFile:
+                        if "Rust" in currentLine:
+                            currentMatch = re.findall(pattern, currentLine)
+                            if len(currentMatch) != 0:
+                                lastMatch = currentMatch[0]
             logLatestFileName = max(logFileNameList)
             with open(logLatestFileName) as rustLogFile:
                 for currentLine in rustLogFile:

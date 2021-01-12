@@ -47,7 +47,8 @@ class UpdateCheck:
         """Get running version from local logs"""
         pattern = "Loaded extension Rust v(\d+\.\d+\.\d+)"
         lastMatch = '0.0.0'
-        logFileNameList = glob.glob(os.path.join(self.oxideLogDir, 'oxide*.txt'))        
+        #glob does not necessarily return these in order. Need to sort them to make sure we get the latest one.
+        logFileNameList = sorted(glob.glob(os.path.join(self.oxideLogDir, 'oxide*.txt')))
         if len(logFileNameList) != 0:
             #Log file rolls over nightly. Need to check the second to last file first to make sure we don't miss the version.
             if len(logFileNameList) >= 2:
@@ -58,7 +59,7 @@ class UpdateCheck:
                             currentMatch = re.findall(pattern, currentLine)
                             if len(currentMatch) != 0:
                                 lastMatch = currentMatch[0]
-            logLatestFileName = max(logFileNameList)
+            logLatestFileName = logFileNameList[-1]
             with open(logLatestFileName) as rustLogFile:
                 for currentLine in rustLogFile:
                     if "Rust" in currentLine:

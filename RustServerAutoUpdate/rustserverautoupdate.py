@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys, signal, getopt, re, glob, os.path, configparser, asyncio
+import sys, signal, getopt, re, glob, os.path, configparser, asyncio, random
 from rustbots import discord, rcon, oxide
 from collections import OrderedDict
 from time import sleep
@@ -164,6 +164,21 @@ class RustMonitor:
                 self.rconBot.send_message('server.save')
             except Exception as ex:
                 print(ex)
+
+    def wipe_check(self):
+        timeZN = timezone(timedelta(hours=0))
+        tm = datetime.now(timeZN).timetuple()
+        if tm.tm_mday <= 7 and tm.tm_wday == 3:
+            #TODO: Setup INI variable for storing the previous wipe date
+            lastwipedatetimestr = "2021-01-12 20:43:18.267496+00:00"
+            previousdatetime = datetime.strptime(lastwipedatetimestr, '%Y-%m-%d %H:%M:%S.%f%z')
+            mindaysbetweenwipe = timedelta(days=27)
+            if datetime.now(timeZN) >= (previousdatetime + mindaysbetweenwipe):
+                newseed = random.randrange(1, 2147483647, 1)
+                currentwipedt = datetime.now(timeZN)
+                #TODO: Save Current Seed. Write New Seed. Write Last wipe time. Trigger restart
+                return
+
     async def update_loop(self):
         self.stop = False
         timeZN = timezone(timedelta(hours=0))

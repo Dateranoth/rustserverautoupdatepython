@@ -13,6 +13,7 @@
     <Name>rustserverautoupdate</Name>
     <RootNamespace>RustServerAutoUpdate</RootNamespace>
     <InterpreterId>MSBuild|RustServerAutoUpdate-WMf8rdv8|$(MSBuildProjectFullPath)</InterpreterId>
+    <IsWindowsApplication>False</IsWindowsApplication>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>

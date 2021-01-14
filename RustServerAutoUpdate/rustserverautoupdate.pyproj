@@ -23,6 +23,9 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="rustbots\mapseed.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="rustbots\oxide.py">
       <SubType>Code</SubType>
     </Compile>

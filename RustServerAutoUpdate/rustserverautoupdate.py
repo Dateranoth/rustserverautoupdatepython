@@ -95,7 +95,8 @@ class RustMonitor:
                     config.add_section(section)
                     config[section]['# enter ' + section + ' settings here.'] = None
                     for (key,value) in userconfig._sections[section].items():
-                        if config.has_option(section, key):
+                        #Check if default section has option since we reading a none active config section.
+                        if config.has_option(config.default_section, key):
                             config[section][key] = value
             for (key,value) in userconfig.defaults().items():
                 if config.has_option(config.default_section, key):

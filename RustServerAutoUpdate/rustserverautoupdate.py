@@ -167,18 +167,9 @@ class RustMonitor:
                 print(ex)
 
     def wipe_check(self):
-        timeZN = timezone(timedelta(hours=0))
-        tm = datetime.now(timeZN).timetuple()
-        if tm.tm_mday <= 7 and tm.tm_wday == 3:
-            #TODO: Setup INI variable for storing the previous wipe date
-            lastwipedatetimestr = "2021-01-12 20:43:18.267496+00:00"
-            previousdatetime = datetime.strptime(lastwipedatetimestr, '%Y-%m-%d %H:%M:%S.%f%z')
-            mindaysbetweenwipe = timedelta(days=27)
-            if datetime.now(timeZN) >= (previousdatetime + mindaysbetweenwipe):
-                newseed = random.randrange(1, 2147483647, 1)
-                currentwipedt = datetime.now(timeZN)
-                #TODO: Save Current Seed. Write New Seed. Write Last wipe time. Trigger restart
-                return
+        #TODO: Moved to separate class. Add check here and trigger restart etc if seed is updated.
+        #Possibly do not trigger restart and wait for server to update.
+        return
 
     async def update_loop(self):
         self.stop = False
@@ -189,6 +180,7 @@ class RustMonitor:
         updateNeeded = False
         while not self.stop:
             if ((datetime.now(timeZN) >= (loopStartTime + loopCycleTime)) or loopStart) and not updateNeeded:
+                #TODO: This needs to be setup in a Try Catch in case the connection fails for some reason.
                 response = self.oxideBot.check_update()
                 if response[0]:
                     print("Found New Version: " + response[3] + " Old Version: " + response[2])

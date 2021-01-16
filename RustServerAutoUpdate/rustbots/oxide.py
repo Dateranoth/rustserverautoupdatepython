@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import requests, json, sys, getopt, re, glob, os.path
+from datetime import datetime, timedelta, timezone
 
 class UpdateCheck:
     """Used to check local oxide version against latest release"""
@@ -44,29 +45,43 @@ class UpdateCheck:
         raise UpdateCheckError("200", gitJSONString, "Could Not Find Download URL")
 
     def get_running_version(self):
-        """Get running version from local logs"""
+        """Get running version from local logs. Checks the current and last month logs.
+           Oxide rolls the logs over nightly, and doesn't necessarily write the latest version on roll over.
+           To make sure the latest version is found, we will iterate over the past 2 months of logs.
+           This was the compromise between reading every log ( could potentially be a lot ) and reading too few."""
         pattern = "Loaded extension Rust v(\d+\.\d+\.\d+)"
-        lastMatch = '0.0.0'
-        #glob does not necessarily return these in order. Need to sort them to make sure we get the latest one.
-        logFileNameList = sorted(glob.glob(os.path.join(self.oxideLogDir, 'oxide*.txt')))
-        if len(logFileNameList) != 0:
-            #Log file rolls over nightly. Need to check the second to last file first to make sure we don't miss the version.
-            if len(logFileNameList) >= 2:
-                logSecondLatestFileName = logFileNameList[-2]
-                with open(logSecondLatestFileName) as rustLogFile:
+        lastMatch = "0.0.0"
+        timeZN = timezone(timedelta(hours=0))
+        tm = datetime.now(timeZN).timetuple()
+        startLog = "oxide_"
+        endLog = "*.txt"
+        dateDivider = "-"
+        thisMonthsLogsYear = int(tm.tm_year)
+        thisMonthsLogsMonth = int(tm.tm_mon)
+
+        if int(tm.tm_mon) == 1:
+            lastMonthsLogsYear = thisMonthsLogsYear - 1
+            lastMonthsLogsMonth = 12
+        else:
+            lastMonthsLogsYear = thisMonthsLogsYear
+            lastMonthsLogsMonth = thisMonthsLogsMonth - 1    
+        lastMonthsLogs = startLog + "{:04d}".format(lastMonthsLogsYear) + dateDivider + "{:02d}".format(lastMonthsLogsMonth) + endLog
+        thisMonthsLogs = startLog + "{:04d}".format(thisMonthsLogsYear) + dateDivider + "{:02d}".format(thisMonthsLogsMonth) + endLog
+
+        #glob does not necessarily return these in order. Need to sort them to make sure the last version is the latest.
+        logFileNameList = sorted(glob.glob(os.path.join(self.oxideLogDir, lastMonthsLogs)))
+        logFileNameList.extend(sorted(glob.glob(os.path.join(self.oxideLogDir, thisMonthsLogs))))
+        numLogFiles = len(logFileNameList)
+
+        if numLogFiles != 0:
+            for logFile in logFileNameList:
+                with open(logFile) as rustLogFile:                    
                     for currentLine in rustLogFile:
                         if "Rust" in currentLine:
                             currentMatch = re.findall(pattern, currentLine)
                             if len(currentMatch) != 0:
                                 lastMatch = currentMatch[0]
-            logLatestFileName = logFileNameList[-1]
-            with open(logLatestFileName) as rustLogFile:
-                for currentLine in rustLogFile:
-                    if "Rust" in currentLine:
-                        currentMatch = re.findall(pattern, currentLine)
-                        if len(currentMatch) != 0:
-                            lastMatch = currentMatch[0]
-        return lastMatch
+        return lastMatch   
 
     def check_update(self, linux = True):
         """Check for updates. Return tuple (Boolean update required, String update url, String runningversion, String latestversion)"""

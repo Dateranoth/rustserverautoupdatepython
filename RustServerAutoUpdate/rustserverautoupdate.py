@@ -10,9 +10,9 @@ from functools import partial
 from datetime import datetime, timedelta, timezone
 
 class RustMonitor:
-    def __init__(self, configPath = '', configSection = 'SERVER1'):
+    def __init__(self, configPath, configName, configSection = 'SERVER1'):
         configSectionUpper = configSection.upper()
-        self.setup_configuration(configPath, configSectionUpper)
+        self.setup_configuration(configPath, configName, configSectionUpper)
         confsec = self.config[configSectionUpper]
         self.oxideLogDIR = confsec['oxide_log_dir']
         self.oxideGitURL = confsec['oxide_git_url']
@@ -40,8 +40,11 @@ class RustMonitor:
         self.msg10Min = confsec['10min_msg']
         self.msg05Min = confsec['5min_msg']
         self.msg01Min = confsec['1min_msg']
+        loggingLevels = {'NOTSET': 0, 'DEBUG': 10, 'INFO': 20, 'WARNING': 30, 'ERROR': 40, 'CRITICAL': 50}
+        self.logLevel = loggingLevels.get(confsec['app_log_level'].upper().strip(), 0)
+        files.SetupLogging(configPath, configName + '.log', self.logLevel)
 
-    def setup_configuration(self, configPath, configSection):
+    def setup_configuration(self, configPath, configName, configSection):
         """Read INI file and update with new options if necessary"""
         confComments = OrderedDict({'DEFAULT': {'# This is the Default configuration.': None,
                                                 '# These settings apply to all instances.': None,
@@ -74,10 +77,11 @@ class RustMonitor:
                                                 '15min_msg': 'Oxide Update Detected. Server will restart in 15 minutes for update.',
                                                 '10min_msg': 'Oxide Update Scheduled. Server will restart in 10 minutes for update.',
                                                 '5min_msg':  'Oxide Update Scheduled. Server will restart in 5 minutes for update.',
-                                                '1min_msg':  'FINAL WARNING! SERVER RESTARTING FOR OXIDE UPDATE IN 1 MINUTE!!'},
+                                                '1min_msg':  'FINAL WARNING! SERVER RESTARTING FOR OXIDE UPDATE IN 1 MINUTE!!',
+                                                'app_log_level':  'INFO #NOTSET,DEBUG,INFO,WARNING,ERROR,CRITICAL'},
                                     configSection:    {}})
-
-        configFile = os.path.join(configPath, "rustserverautoupdate.ini")
+        
+        configFile = os.path.join(configPath, configName + '.ini')
         userconfig = configparser.ConfigParser()
         userconfig.read(configFile, encoding='utf-8')
 
@@ -303,7 +307,8 @@ def argumenthelp():
           "OPTIONAL INPUT:\n"          
           "-s --section       Section Name for configuration. This allows for multiple instances to be ran from same configuration.\n")
 def main(argv):
-    configPath = os.path.dirname(os.path.realpath(__file__))
+    configPath, fileName = os.path.split(os.path.realpath(__file__))
+    configName = fileName.replace('.py', '')
     sectionName = ""
     try:
         opts, args = getopt.getopt(argv,"hc:s:",["help", "configpath=", "section="])
@@ -325,7 +330,8 @@ def main(argv):
         sectionName = "SERVER1"
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
-    rm = RustMonitor(configPath,sectionName)
+
+    rm = RustMonitor(configPath,configName,sectionName)
     rm.main()
 
 if __name__ == "__main__":

@@ -24,7 +24,7 @@ class SetupLogging:
         handler.setFormatter(logging.Formatter(fmt=fileFormat, datefmt='%Y-%m-%d %H:%M:%S%z'))        
         logger.addHandler(handler)
         self.logger = logging.getLogger(__name__)
-        self.logger.debug("Finished Logging Setup")
+        self.logger.debug("Logging Setup Complete")
 
 class ManageFiles:    
     def backup_file(self, filePath, fileName, quantity = 10, extension = ".bak"):

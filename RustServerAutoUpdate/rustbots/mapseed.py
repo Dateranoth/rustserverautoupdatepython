@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys, getopt, re, os.path, configparser, random
+import sys, getopt, re, configparser, random, os.path, glob, logging
+from os import remove
+from shutil import copy2
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 
@@ -12,6 +14,7 @@ class MapSeedBot:
         """configPath: Path where the rusterserverseedlog.ini should be saved
            configSection: [SECTION] for this instance. Usually Server Name. Default: SERVER1
            serverSeedConfigPath: Full path to INI containing seed= Default: '/home/rustserver/lgsm/config-lgsm/rustserver/rustserver.cfg'. """
+        self.logger = logging.getLogger(__name__)
         self.configSection = configSection.upper()
         self.configPath = configPath
         self.serverSeedConfigPath = serverSeedConfigPath
@@ -79,12 +82,12 @@ class MapSeedBot:
                     match = re.findall(pattern, line)
                     if len(match) != 0:
                         line = re.sub(pattern, 'seed="'+str(newSeed)+'"', line)
-                        seedUpdated = True
+                        seedUpdated = True                        
                 configfilewrite.write(line)
             if not seedUpdated:
                 configfilewrite.write('\n')
                 configfilewrite.write('seed="'+str(newSeed)+'" # default random; range : 1 to 2147483647 ; used to change or reproduce a procedural map')
-
+                
     def wipe_check(self):
         timeZN = timezone(timedelta(hours=0))
         tm = datetime.now(timeZN).timetuple()
@@ -104,6 +107,27 @@ class MapSeedBot:
         else:
             return (False, "Not the first Thursday of the Month", self.lastWipe)
 
+
+    def backup_file(self, filePath, fileName, quantity = 10, extension = ".bak"):
+        timeZN = timezone(timedelta(hours=0))
+        tm = datetime.now(timeZN)
+        timeStamp =  tm.strftime("-%Y-%m-%d_%H.%M.%S%z")
+        wildcard = "*"
+        sourceFilePath = os.path.join(filePath, fileName)
+        backupFilePath = os.path.join(filePath, fileName + timeStamp + extension)
+        oldFileSearchPath = os.path.join(filePath, fileName + wildcard + extension)
+        print("Source: " + sourceFilePath + " Dest: " + backupFilePath + " OldBackups: " + oldFileSearchPath)
+        oldBackupFiles = sorted(glob.glob(oldFileSearchPath))
+        if len(oldBackupFiles) >= quantity:
+            remove(oldBackupFiles[0])
+            print("Removed Backup File: " + oldBackupFiles[0])
+        #with open(fileNamePath, 'r', encoding='utf-8') as backupSource, open(backupFilePath, 'w', encoding='utf-8') as backupDesination:
+        #    for line in backupSource:
+        #        backupDesination.write(line)
+        copy2(sourceFilePath, backupFilePath)
+
+        
+        
 def argumenthelp():
     print("\nSyntax: mapseed.py -c <Path to Server Seed Configuration File>\n"
           "Example: mapseed.py -c /home/rustserver/lgsm/config-lgsm/rustserver/rustserver.cfg"

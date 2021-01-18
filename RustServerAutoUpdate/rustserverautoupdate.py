@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import sys, signal, getopt, re, glob, os.path, configparser, asyncio, random
-from rustbots import discord, rcon, oxide
+from rustbots import discord, rcon, oxide, mapseed, files
 from collections import OrderedDict
 from time import sleep
 from subprocess import run

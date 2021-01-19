@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys, signal, getopt, re, glob, os.path, configparser, asyncio, random
+import sys, signal, getopt, re, glob, os.path, configparser, asyncio, random, logging
 from rustbots import discord, rcon, oxide, mapseed, files
 from collections import OrderedDict
 from time import sleep
@@ -11,9 +11,20 @@ from datetime import datetime, timedelta, timezone
 
 class RustMonitor:
     def __init__(self, configPath, configName, configSection = 'SERVER1'):
+        #Setup Logging. Default to Info. This will be updated after configuration is read.
+        logsetup = files.SetupLogging(configPath, configName + '.log', 20)
+        self.logger = logging.getLogger(__name__)
+        self.logger.info("Rust Server Auto Update Starting")
+
+        #Setup File Manager
+        self.fileManage = files.ManageFiles()
+
+        #Setup Configuration by checking against defaults. Once file read, assign to variable.
         configSectionUpper = configSection.upper()
         self.setup_configuration(configPath, configName, configSectionUpper)
         confsec = self.config[configSectionUpper]
+
+        #Assign variables to all data read from Configuration file.
         self.oxideLogDIR = confsec['oxide_log_dir']
         self.oxideGitURL = confsec['oxide_git_url']
         self.oxideCheckTime = self.config.getfloat(configSectionUpper, 'oxide_check_time_in_min')
@@ -40,9 +51,9 @@ class RustMonitor:
         self.msg10Min = confsec['10min_msg']
         self.msg05Min = confsec['5min_msg']
         self.msg01Min = confsec['1min_msg']
-        loggingLevels = {'NOTSET': 0, 'DEBUG': 10, 'INFO': 20, 'WARNING': 30, 'ERROR': 40, 'CRITICAL': 50}
-        self.logLevel = loggingLevels.get(confsec['app_log_level'].upper().strip(), 0)
-        files.SetupLogging(configPath, configName + '.log', self.logLevel)
+
+        #Update log level from user configuration for writing to file.
+        logsetup.change_level(confsec['app_log_level'])
 
     def setup_configuration(self, configPath, configName, configSection):
         """Read INI file and update with new options if necessary"""
@@ -86,6 +97,7 @@ class RustMonitor:
         userconfig.read(configFile, encoding='utf-8')
 
         if (len(userconfig.defaults()) != len(confDefaults['DEFAULT'])) or not userconfig.has_section(configSection):
+            self.logger.info("New Defaults or New Section Detected. Updating Configuration File.")
             config = configparser.ConfigParser(allow_no_value=True)            
             config.read_dict(confComments)
             config.read_dict(confDefaults)
@@ -99,13 +111,14 @@ class RustMonitor:
                     config.add_section(section)
                     config[section]['# enter ' + section + ' settings here.'] = None
                     for (key,value) in userconfig._sections[section].items():
-                        #Check if default section has option since we reading a none active config section.
+                        #Check if default section has option since we are reading a none active config section.
                         if config.has_option(config.default_section, key):
                             config[section][key] = value
             for (key,value) in userconfig.defaults().items():
                 if config.has_option(config.default_section, key):
                     config[config.default_section][key] = value
            
+            self.fileManage.backup_file(configPath, configName, 5)
             with open(configFile, 'w', encoding='utf-8') as configfile:
                 config.write(configfile)
         self.config = configparser.ConfigParser()
@@ -330,9 +343,10 @@ def main(argv):
         sectionName = "SERVER1"
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
-
+    
     rm = RustMonitor(configPath,configName,sectionName)
     rm.main()
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import json, sys, getopt
+import json, sys, getopt, logging
 from websocket import create_connection, _exceptions
 
 class RCONBot:
@@ -10,6 +10,7 @@ class RCONBot:
         self.port = port
         self.password = password
         self.botName = botName
+        self.logger = logging.getLogger(__name__)
 
     def send_message(self, command, identifier = "-1", timeout = 10):
         """Send Message to Rust RCON. Return reply from server.
@@ -19,9 +20,13 @@ class RCONBot:
         jsonDict = {"Identifier": identifier,
                    "Message": command,
                    "Name": self.botName}
+        self.logger.debug("Sending RCON Message: " + json.dumps(jsonDict))
         ws = create_connection("ws://" + self.ip + ":" + self.port + "/" + self.password, timeout)
         ws.send(json.dumps(jsonDict))
         reply = json.loads(ws.recv())
+        # Rust wants to take forever to respond to the close. If we just abandon the socket instead of closing
+        # Rust complains about it and we end up spamming the console. This is basically a cheat to start
+        # the process of closing the connection without waiting for Rust to actually tell us it's closed.
         ws.close(timeout=.05)
         return reply
 

@@ -10,14 +10,24 @@ from datetime import datetime, timedelta, timezone
 class MapSeedBot:
     """Save previous seed and change to new random seed on periodic basis
        Check day is always first Thursday of the month"""
-    def __init__(self, configPath = '', configSection = 'SERVER1', serverSeedConfigPath = '/home/rustserver/lgsm/config-lgsm/rustserver/rustserver.cfg'):
-        """configPath: Path where the rusterserverseedlog.ini should be saved
+    def __init__(self, configPath, configName, serverSeedConfigPath, configSection = 'SERVER1'):
+        """configPath: Path where the seed log INI should be saved
+           configName: Name of seed log cfg file. Example: mapseed.ini
            configSection: [SECTION] for this instance. Usually Server Name. Default: SERVER1
-           serverSeedConfigPath: Full path to INI containing seed= Default: '/home/rustserver/lgsm/config-lgsm/rustserver/rustserver.cfg'. """
+           serverSeedConfigPath: Full path to INI containing seed= Default for LinuxGSM: '/home/rustserver/lgsm/config-lgsm/rustserver/rustserver.cfg'. """        
+
         self.logger = logging.getLogger(__name__)
-        self.configSection = configSection.upper()
+        try:
+            import rustbots.files
+            self.fileManage = rustbots.files.ManageFiles()
+        except ImportError:
+            self.logger.warning("Missing rustbots.files. Configurations will not be backed up before writing.")
+            self.fileManage = None
+
         self.configPath = configPath
+        self.configName = configName
         self.serverSeedConfigPath = serverSeedConfigPath
+        self.configSection = configSection.upper()        
         self.modify_configuration()
 
     def modify_configuration(self, saveSeed = False, newSeed = '1'):
@@ -25,6 +35,7 @@ class MapSeedBot:
            last wipe will be current time. Pass newSeed to be written to seed INI file
            Will set self.lastWipe to what was read from INI or what was just written"""
         configPath = self.configPath
+        configName = self.configName
         configSection = self.configSection
         timeZN = timezone(timedelta(hours=0))
         wipeDateTime = datetime.now(timeZN)
@@ -35,7 +46,7 @@ class MapSeedBot:
         confDefaults = OrderedDict({'DEFAULT': {'last_wipe':  str(wipeDateTime)},
                                     configSection:    {'last_wipe':  str(wipeDateTime)}})
 
-        configFile = os.path.join(configPath, "rustserverseedlog.ini")
+        configFile = os.path.join(configPath, configName)
         userconfig = configparser.ConfigParser(delimiters=('='))
         userconfig.read(configFile, encoding='utf-8')
 
@@ -62,6 +73,10 @@ class MapSeedBot:
                     config[config.default_section][key] = value
             if saveSeed:
                 config[config.default_section]['last_wipe'] = str(wipeDateTime)
+
+            #Backup seed log if possible then write the configuration.
+            if not (self.fileManage is None):
+                self.fileManage.backup_file(configPath, configName, 2)
             with open(configFile, 'w', encoding='utf-8') as configfile:
                 config.write(configfile)
         self.config = configparser.ConfigParser(delimiters=('='))
@@ -134,18 +149,20 @@ def argumenthelp():
           "\n"
           "On first run logs current date as last wipe. Each additional run will check for first day of the month and update seed after a minimum of 27 days since last wipe.\n\n"
           "REQUIRED INPUT:\n"
-          "-c --configpath    Path where Seed Configuration File is Located. MUST HAVE WRITE PERMISSION.\n"
+          "-c --configpath    Path where Seed Configuration File is Located. MUST HAVE WRITE PERMISSION.\n"          
           "OPTIONAL INPUT:\n"
           "-f --forcewipe     Immediately changes the seed and logs current time as last wipe. Pass custom seed (range : 1 to 2147483647) or 0 for random\n"
-          "-p --pathINI       Full path to store seed log and last wipe time. Default: Path mapseed.py is located in.\n"
+          "-p --pathINI       Path to store seed log and last wipe time. Default: Path mapseed.py is located in.\n"
+          "-n --iniName       File Name to wrie seed logs and last wipe date. Default mapseed.ini"
           "-s --section       Section Name for configuration. This allows for multiple instances to be ran from same configuration. Default: SERVER1\n")
 def main(argv):
     serverConfigPath = ""
+    seedLogName = ""
     seedLogPath = ""
     sectionName = ""
     forceWipe = False
     try:
-        opts, args = getopt.getopt(argv,"hc:f:p:s:",["help", "configPath=", "forcewipe=", "pathINI=", "section="])
+        opts, args = getopt.getopt(argv,"hc:f:p:n:s:",["help", "configPath=", "forcewipe=", "pathINI=", "iniName=", "section="])
     except getopt.GetoptError as err:
         print("Incorrect Syntax: -h or --help for more information")
         print("\nSyntax: mapseed.py -c <Path to Server Seed Configuration File>\n")
@@ -155,7 +172,7 @@ def main(argv):
             argumenthelp()
             sys.exit()
         elif opt in ("-c", "--configpath"):
-            serverConfigPath = arg.strip()
+            serverConfigPath = arg.strip()        
         elif opt in ("-f", "--forcewipe"):
             forceWipe = True
             if arg.isnumeric:
@@ -173,18 +190,24 @@ def main(argv):
                 seed = 2147483647
         elif opt in ("-p", "pathINI"):
             seedLogPath = arg.strip()
+        elif opt in ("-n", "--iniName"):
+            seedLogName = arg.strip()
         elif opt in ("-s", "--section"):
             sectionName = arg.strip()
     if not serverConfigPath:
-        print("Incorrect Syntax: configpath required\n"
+        print("Incorrect Syntax: configpath and configname required\n"
               "-h or --help for more information")
         sys.exit()
+
+    logPath, fileName = os.path.split(os.path.realpath(__file__))    
     if not seedLogPath:
-        seedLogPath = os.path.dirname(os.path.realpath(__file__))
+        seedLogPath = logPath
+    if not seedLogName:
+        seedLogName = fileName.replace('.py', '')
     if not sectionName:
         sectionName = "SERVER1"
 
-    msb = MapSeedBot(seedLogPath, sectionName, serverConfigPath)
+    msb = MapSeedBot(seedLogPath, seedLogName, serverConfigPath, sectionName)
     if forceWipe:
         msb.change_seed(seed)
         msb.modify_configuration(True, seed)

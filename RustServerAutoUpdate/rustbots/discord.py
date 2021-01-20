@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import requests, json, sys, getopt
+import requests, json, sys, getopt, logging
 
 class ServerInformation:
     def __init__(self, gameName, serverName, serverIP, serverHostName = ""):
@@ -19,6 +19,7 @@ class DiscordBot:
         webHook from Discord Bot Setup. Should be URL.
         botName is not required, but will be displayed as user on Discord.
         botAvatar allows custom user icon to be displayed. URL."""
+        self.logger = logging.getLogger(__name__)
         self.webHook = webHook
         self.botName = botName
         self.botAvatar = botAvatar
@@ -57,6 +58,7 @@ class DiscordBot:
                             ]
                   }]
         }
+        self.logger.debug("Sending Message to Discord: Header: " + str(headers) + " Message: " + json.dumps(jsonDict))
         r = requests.post(self.webHook + "?wait=true", headers=headers, data=json.dumps(jsonDict))
         return r.text
         
@@ -118,9 +120,11 @@ def main(argv):
         print("Incorrect Syntax: webhook, botname, and message required\n"
               "-h or --help for more information")
         sys.exit()
+
     sInfo = ServerInformation(gameName, serverName, serverIP, serverHostName)
     bot = DiscordBot(webHook, botName, botAvatar)
     reply = bot.send_message(sInfo, message, title)
     print(reply)
+    
 if __name__ == "__main__":
    main(sys.argv[1:])

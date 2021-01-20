@@ -7,25 +7,33 @@ class SetupLogging:
         logFile = Name of Log File Example: rustserverautoupdate.log
         logLevel = Minimum Level to write to file. Integer: NOTSET=0, DEBUG=10, INFO=20, WARN=30, ERROR=40, and CRITICAL=50
         rotatBackups, rotateWhen, rotateInterval correspond to logging.handlers.TimedRotatingFileHandler when, interval, backupCount"""
-
-        #One Format for console logging and one for file logging.
-        consoleFormat = '[%(levelname)s] [%(name)s]: %(message)s'
-        fileFormat = '[%(asctime)s][%(levelname)s] [%(name)s] [%(message)s]'
  
-        # Configure the Basic Logging. This sets DEBUG output to console. Formats date, but isn't currenlty used in console.
-        logging.basicConfig(level=logging.DEBUG, format=consoleFormat, datefmt='%Y-%m-%d %H:%M:%S%z')
+        # Get the root logger and set the level to NOTSET (0)
+        # This is so other loggers inherit properly.
+        # consoleHandler and fileHandler can then be set independently
         logger = logging.getLogger()
+        logger.setLevel(logging.NOTSET)
+
+        #Check if any handlers are already configured at root level. If so, remove them. (This is obviously intended to be the master logging setup)
+        for x in range(0, len(logger.handlers), 1):
+            if len(logger.handlers) > 0:
+                logger.removeHandler(logger.handlers[0])
+         
+        # Create a console handler, set the level to DEBUG, and format without timestamp
+        consoleHandler = logging.StreamHandler()
+        consoleHandler.setLevel(logging.DEBUG)
+        consoleHandler.setFormatter(logging.Formatter(fmt='[%(levelname)s] [%(name)s]: %(message)s', datefmt='%Y-%m-%d %H:%M:%S%z'))  
+
+        # Create a file handler to write to file and Rotate on schedule, set the level to logLevel, and format with timestamp
+        fileHandler = logging.handlers.TimedRotatingFileHandler(filename=os.path.join(logPath, logFile), when = rotateWhen, interval = rotateInterval, backupCount = rotateBackups, encoding='utf-8')
+        fileHandler.setLevel(logLevel)
+        fileHandler.setFormatter(logging.Formatter(fmt='[%(asctime)s][%(levelname)s] [%(name)s] [%(message)s]', datefmt='%Y-%m-%d %H:%M:%S%z'))
         
-        # Create a file handler to write to file and Rotate nightly. 
-        # Set the log level on the handler.
-        # Format the date string and set the Formatter on the handler.
-        # Add the handler to the logger. Check if it has already been created. If so, remove it and add it back with updated parameters.
-        if len(logging.getLogger().handlers) >= 2:
-            logger.removeHandler(logging.getLogger().handlers[1])
-        handler = logging.handlers.TimedRotatingFileHandler(filename=os.path.join(logPath, logFile), when = rotateWhen, interval = rotateInterval, backupCount = rotateBackups, encoding='utf-8')
-        handler.setLevel(logLevel)
-        handler.setFormatter(logging.Formatter(fmt=fileFormat, datefmt='%Y-%m-%d %H:%M:%S%z'))        
-        logger.addHandler(handler)
+        # Add the Handlers to the logger
+        logger.addHandler(consoleHandler)
+        logger.addHandler(fileHandler)
+
+        # Create named logger for SetupLogging to use.
         self.logger = logging.getLogger(__name__)
     
     def change_level(self, level, console = False):
@@ -40,10 +48,10 @@ class SetupLogging:
             loggingLevels = {'NOTSET': 0, 'DEBUG': 10, 'INFO': 20, 'WARNING': 30, 'ERROR': 40, 'CRITICAL': 50}
             newLevel = loggingLevels.get(level.upper().strip(), level)
         if isinstance(newLevel, int):
-            if console and logger.level != newLevel:
-                logger.setLevel(newLevel)
-                self.logger.info("Console Log Level Changed to: " + str(logger.level))
-                return logger.level
+            if console and len(logger.handlers) >= 1 and logger.handlers[0].level != newLevel:
+                logger.handlers[0].setLevel(newLevel)
+                self.logger.info("Console Log Level Changed to: " + str(logger.handlers[0].level))
+                return logger.handlers[0].level
             elif len(logger.handlers) >= 2 and logger.handlers[1].level != newLevel:
                 logger.handlers[1].setLevel(newLevel)
                 self.logger.info("File Log Level Changed to: " + str(logger.handlers[1].level ))

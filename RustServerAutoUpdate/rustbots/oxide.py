@@ -1,18 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import requests, json, sys, getopt, re, glob, os.path
+import requests, json, sys, getopt, re, glob, os.path, logging
 from datetime import datetime, timedelta, timezone
 
 class UpdateCheck:
     """Used to check local oxide version against latest release"""
     def __init__(self, oxideLogDir, gitURL = "https://api.github.com/repositories/94599577/releases/latest"):
         """Initiate by assigning directory. Optionally point to different release. Not recommended"""
+        self.logger = logging.getLogger(__name__)
         self.oxideLogDir = os.path.join("", oxideLogDir)
         self.gitURL = gitURL
 
     def get_json_from_api(self):
         """Query Git API for json String with Latest Update Information"""
         r = requests.get(self.gitURL)
+        self.logger.debug("Git URL Response: (" + str(r.status_code) + ") " + r.text)
         if r.status_code == 200:
             return r.text
         else:
@@ -67,6 +69,8 @@ class UpdateCheck:
             lastMonthsLogsMonth = thisMonthsLogsMonth - 1    
         lastMonthsLogs = startLog + "{:04d}".format(lastMonthsLogsYear) + dateDivider + "{:02d}".format(lastMonthsLogsMonth) + endLog
         thisMonthsLogs = startLog + "{:04d}".format(thisMonthsLogsYear) + dateDivider + "{:02d}".format(thisMonthsLogsMonth) + endLog
+        self.logger.debug("Last Month Log Search String: " + lastMonthsLogs)
+        self.logger.debug("This Month Log Search String: " + thisMonthsLogs)
 
         #glob does not necessarily return these in order. Need to sort them to make sure the last version is the latest.
         logFileNameList = sorted(glob.glob(os.path.join(self.oxideLogDir, lastMonthsLogs)))
@@ -81,6 +85,7 @@ class UpdateCheck:
                             currentMatch = re.findall(pattern, currentLine)
                             if len(currentMatch) != 0:
                                 lastMatch = currentMatch[0]
+                                self.logger.debug("Found Version: " + lastMatch + " in Line: " + currentLine.strip() + " in File " + logFile)
         return lastMatch   
 
     def check_update(self, linux = True):

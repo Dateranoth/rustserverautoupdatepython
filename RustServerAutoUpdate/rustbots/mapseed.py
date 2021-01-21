@@ -9,13 +9,12 @@ from datetime import datetime, timedelta, timezone
 #TODO: Clean up code. Put in checks for file in use.
 class MapSeedBot:
     """Save previous seed and change to new random seed on periodic basis
-       Check day is always first Thursday of the month"""
-    def __init__(self, configPath, configName, serverSeedConfigPath, configSection = 'SERVER1'):
-        """configPath: Path where the seed log INI should be saved
+           Check day is always first Thursday of the month
+           configPath: Path where the seed log INI should be saved
            configName: Name of seed log cfg file. Example: mapseed.ini
            configSection: [SECTION] for this instance. Usually Server Name. Default: SERVER1
-           serverSeedConfigPath: Full path to INI containing seed= Default for LinuxGSM: '/home/rustserver/lgsm/config-lgsm/rustserver/rustserver.cfg'. """        
-
+           serverSeedConfigPath: Full path to INI containing seed= Default for LinuxGSM: '/home/rustserver/lgsm/config-lgsm/rustserver/rustserver.cfg'. """  
+    def __init__(self, configPath, configName, serverSeedConfigPath, configSection = 'SERVER1'):
         self.logger = logging.getLogger(__name__)
         try:
             import rustbots.files
@@ -76,7 +75,7 @@ class MapSeedBot:
 
             #Backup seed log if possible then write the configuration.
             if not (self.fileManage is None):
-                self.fileManage.backup_file(configPath, configName, 2)
+                self.fileManage.backup_file(configPath, configName, 1)
             with open(configFile, 'w', encoding='utf-8') as configfile:
                 config.write(configfile)
         self.config = configparser.ConfigParser(delimiters=('='))
@@ -87,10 +86,15 @@ class MapSeedBot:
 
     def change_seed(self, newSeed):
         linelist = list
+
+        #Backup configuration if possible.
+        if not (self.fileManage is None):
+            self.fileManage.backup_file(self.serverSeedConfigPath, '', 3)
+
         with open(self.serverSeedConfigPath, 'r', encoding='utf-8') as configfileread:
             linelist = configfileread.readlines()
         with open(self.serverSeedConfigPath, 'w', encoding='utf-8') as configfilewrite:
-            pattern = '^\s*seed\s*=\s*\"?(\d+)\"?'
+            pattern = '(?i)^\s*(?:server\.)?seed\s*=?\s*\"?\s*(\d+)(?:\s*\")?'
             seedUpdated = False
             for line in linelist:
                 if "seed" in line.lower():
@@ -102,12 +106,12 @@ class MapSeedBot:
             if not seedUpdated:
                 configfilewrite.write('\n')
                 configfilewrite.write('seed="'+str(newSeed)+'" # default random; range : 1 to 2147483647 ; used to change or reproduce a procedural map')
-                
+             
     def wipe_check(self):
         timeZN = timezone(timedelta(hours=0))
         tm = datetime.now(timeZN).timetuple()
         if tm.tm_mday <= 7 and tm.tm_wday == 3:
-            #Update the last wipe variable from the INI. We should do this each time to make sure it is up to date.
+            #Update the last wipe variable from the INI. Do this each time to make sure it is up to date.
             self.modify_configuration()
             previousdatetime = datetime.strptime(str(self.lastWipe), '%Y-%m-%d %H:%M:%S.%f%z')
             minDaysBetweenWipe = timedelta(days=27)
@@ -120,28 +124,7 @@ class MapSeedBot:
             else:
                 return (False, "Not enough days have passed since last wipe.", self.lastWipe)
         else:
-            return (False, "Not the first Thursday of the Month", self.lastWipe)
-
-
-    def backup_file(self, filePath, fileName, quantity = 10, extension = ".bak"):
-        timeZN = timezone(timedelta(hours=0))
-        tm = datetime.now(timeZN)
-        timeStamp =  tm.strftime("-%Y-%m-%d_%H.%M.%S%z")
-        wildcard = "*"
-        sourceFilePath = os.path.join(filePath, fileName)
-        backupFilePath = os.path.join(filePath, fileName + timeStamp + extension)
-        oldFileSearchPath = os.path.join(filePath, fileName + wildcard + extension)
-        print("Source: " + sourceFilePath + " Dest: " + backupFilePath + " OldBackups: " + oldFileSearchPath)
-        oldBackupFiles = sorted(glob.glob(oldFileSearchPath))
-        if len(oldBackupFiles) >= quantity:
-            remove(oldBackupFiles[0])
-            print("Removed Backup File: " + oldBackupFiles[0])
-        #with open(fileNamePath, 'r', encoding='utf-8') as backupSource, open(backupFilePath, 'w', encoding='utf-8') as backupDesination:
-        #    for line in backupSource:
-        #        backupDesination.write(line)
-        copy2(sourceFilePath, backupFilePath)
-
-        
+            return (False, "Not the first Thursday of the Month", self.lastWipe)        
         
 def argumenthelp():
     print("\nSyntax: mapseed.py -c <Path to Server Seed Configuration File>\n"

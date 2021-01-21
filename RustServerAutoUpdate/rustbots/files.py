@@ -71,9 +71,9 @@ class ManageFiles:
         NOTE: This does a wildcard search of filePath + fileName + * + extension to find and delete
         oldest file after quantity is exceeded. Logs warning if source file not found. Raises FileNotFoundError if backup cannot be found after copy.
         filePath = Path to file to backup.
-        fileName = Name of file to backup.
+        fileName = Name of file to backup. Pass Empty String if filename is in filePath.
         quantity = Number of backups to keep. Oldest file deleted when quantity exceeded.
-        extension = what to append to end of file.        
+        extension = what to append to end of backup file.        
         """
 
         #Create the source,  backup, and old backup paths. Write them out to debug.
@@ -81,9 +81,14 @@ class ManageFiles:
         tm = datetime.now(timeZN)
         timeStamp =  tm.strftime("-%Y-%m-%d_%H.%M.%S%z")
         wildcard = "*" 
-        sourceFilePath = os.path.join(filePath, fileName)
-        backupFilePath = os.path.join(filePath, fileName + timeStamp + extension)
-        oldFileSearchPath = os.path.join(filePath, fileName + wildcard + extension)
+        if fileName.strip() == '':
+            sourceFilePath = os.path.abspath(filePath)
+            backupFilePath = os.path.abspath(filePath + timeStamp + extension)
+            oldFileSearchPath = os.path.abspath(filePath + wildcard + extension)
+        else:
+            sourceFilePath = os.path.join(filePath, fileName)
+            backupFilePath = os.path.join(filePath, fileName + timeStamp + extension)
+            oldFileSearchPath = os.path.join(filePath, fileName + wildcard + extension)
         self.logger.debug("Source: " + sourceFilePath + " Dest: " + backupFilePath + " OldBackups: " + oldFileSearchPath)
 
         #Check that the source exists. If not, log the warning and return.

@@ -10,7 +10,7 @@ class UpdateCheck:
         self.logger = logging.getLogger(__name__)
         self.oxideLogDir = os.path.join("", oxideLogDir)
         self.gitURL = gitURL
-
+        
     def get_json_from_api(self):
         """Query Git API for json String with Latest Update Information"""
         r = requests.get(self.gitURL)
@@ -86,6 +86,10 @@ class UpdateCheck:
                             if len(currentMatch) != 0:
                                 lastMatch = currentMatch[0]
                                 self.logger.debug("Found Version: " + lastMatch + " in Line: " + currentLine.strip() + " in File " + logFile)
+            if lastMatch == '0.0.0':
+                self.logger.warning('No version was found in Oxide Log Files. Assuming this is the first run. Check Oxide Log Directory setting if this message persists.')
+        else:
+            self.logger.warning('No Oxide Log Files Found. Assuming this is the first run. Check Oxide Log Directory setting if this message persists.')
         return lastMatch   
 
     def check_update(self, linux = True):

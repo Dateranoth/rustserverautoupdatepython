@@ -53,7 +53,7 @@ class RustMonitor:
         self.msg01Min = confsec['1min_msg']
 
         #Update log level from user configuration for writing to file.
-        logsetup.change_level(confsec['app_log_level'])
+        logsetup.change_level(confsec['file_log_level'])
 
     def setup_configuration(self, configPath, configName, configSection):
         """Read INI file and update with new options if necessary"""
@@ -61,7 +61,7 @@ class RustMonitor:
                                                 '# These settings apply to all instances.': None,
                                                 '# New options will be added here on upgrade.': None,
                                                 '# Copy to appropriate section below and update as necessary.': None,
-                                                '# Individual instance settings will override defaults.': None},
+                                                '# Individual instance settings will override defaults.': None,},
                                     configSection   : {'# Enter '+ configSection +' Settings Here.': None}})
         confDefaults = OrderedDict({'DEFAULT': {'oxide_log_dir':  '/home/rustserver/serverfiles/oxide/logs',
                                                 'oxide_git_url': 'https://api.github.com/repositories/94599577/releases/latest',
@@ -89,15 +89,14 @@ class RustMonitor:
                                                 '10min_msg': 'Oxide Update Scheduled. Server will restart in 10 minutes for update.',
                                                 '5min_msg':  'Oxide Update Scheduled. Server will restart in 5 minutes for update.',
                                                 '1min_msg':  'FINAL WARNING! SERVER RESTARTING FOR OXIDE UPDATE IN 1 MINUTE!!',
-                                                'app_log_level':  'INFO #NOTSET,DEBUG,INFO,WARNING,ERROR,CRITICAL'},
+                                                'file_log_level':  'INFO'},
                                     configSection:    {}})
         
         configFile = os.path.join(configPath, configName + '.ini')
         userconfig = configparser.ConfigParser()
         userconfig.read(configFile, encoding='utf-8')
 
-        if (len(userconfig.defaults()) != len(confDefaults['DEFAULT'])) or not userconfig.has_section(configSection):
-            self.logger.info("New Defaults or New Section Detected. Updating Configuration File.")
+        if (len(userconfig.defaults()) != len(confDefaults['DEFAULT'])) or not userconfig.has_section(configSection):            
             config = configparser.ConfigParser(allow_no_value=True)            
             config.read_dict(confComments)
             config.read_dict(confDefaults)
@@ -118,9 +117,13 @@ class RustMonitor:
                 if config.has_option(config.default_section, key):
                     config[config.default_section][key] = value
            
-            self.fileManage.backup_file(configPath, configName, 5)
+            # Backup existing configuration, write new configuration, notify user of new config, and exit.
+            self.fileManage.backup_file(configFile, '', 5)
             with open(configFile, 'w', encoding='utf-8') as configfile:
                 config.write(configfile)
+            self.logger.critical('New Defaults or New Section Detected. Updating Configuration File. Please Check Settings and Restart')
+            sys.exit(0)
+
         self.config = configparser.ConfigParser()
         self.config.read_dict(confDefaults)
         self.config.read(configFile, encoding='utf-8')
@@ -162,31 +165,45 @@ class RustMonitor:
                 self.discordBotName = 'Unknown Bot'
     def send_msgs(self, msg):
         """Containted method to send messages to both discord and RCON"""
-        #TODO: Add logging to exception messages.
         if self.useDiscord:
             try:
                 self.discordBot.send_message(self.serverinfo, msg, self.discordMsgTitle)
             except Exception as ex:
-                print(ex)
+                self.logger.exception('Error Sending Message via Discord: {0}'.format(ex))
         if self.useRCON:
             try:
                 self.rconBot.send_message('say ' + msg)
             except Exception as ex:
-                print(ex)
+                self.logger.exception('Error Sending Message via RCON: {0}'.format(ex))
     def kick_save(self):
         """Containted method to kick players and save before restart."""
-        #TODO: Add logging to exception messages.
         if self.useRCON:
             try:
                 self.rconBot.send_message('kickall "" "Server Restarting"')
                 self.rconBot.send_message('server.save')
             except Exception as ex:
-                print(ex)
+                self.logger.exception('Error Sending Kick / Save Command via RCON: {0}'.format(ex))
 
     def wipe_check(self):
         #TODO: Moved to separate class. Add check here and trigger restart etc if seed is updated.
         #Possibly do not trigger restart and wait for server to update.
         return
+
+    def oxide_check(self):
+        try:
+            response = self.oxideBot.check_update()
+            if response[0]:
+                self.logger.info("Found New Oxide Version: " + response[3] + " Old Version: " + response[2])
+                return True
+            else:
+                self.logger.info("Oxide Up to Date: " + response[2])
+                return False
+        except oxide.UpdateCheckError as ex:
+            self.logger.exception("Error Checking for Oxide Update: " + ex.response + ' ' + ex.msg + ' ' + ex.text)
+            return False
+        except:
+            self.logger.exception("Error Checking for Oxide Update: ")
+            return False
 
     async def update_loop(self):
         self.stop = False
@@ -197,14 +214,10 @@ class RustMonitor:
         updateNeeded = False
         while not self.stop:
             if ((datetime.now(timeZN) >= (loopStartTime + loopCycleTime)) or loopStart) and not updateNeeded:
-                #TODO: This needs to be setup in a Try Catch in case the connection fails for some reason.
-                response = self.oxideBot.check_update()
-                if response[0]:
-                    print("Found New Version: " + response[3] + " Old Version: " + response[2])
-                    updateNeeded = True
-                else:
-                    #self.send_msgs("Oxide Up to Date: " + response[2])
-                    print("Oxide Up to Date: " + response[2])
+                # Check for update on each loop
+                with ThreadPoolExecutor() as executor:
+                        updateNeeded = await self.loop.run_in_executor(executor, self.oxide_check)
+
                 loopStartTime = datetime.now(timeZN)
                 messageWaitTime = timedelta(minutes=0)
             if updateNeeded and not loopStart:
@@ -311,13 +324,12 @@ def signal_handler(signum, frame):
     raise GracefulExit()
 
 def argumenthelp():
-    print("\nSyntax: rustserverautoupdate.py -c <Path to Configuration INI> [-s <Section Name - Used for multiple instances>]\n"
+    print("\nSyntax: rustserverautoupdate.py -c [Path to Configuration INI] [-s <Section Name - Used for multiple instances>]\n"
           "Example: rustserverautoupdate.py -c \home\rustserver\rustserverautoupdate -s SERVER1\n"
           "\n"
           "Check for updates. Return Space Separated String Array (Boolean update url, updatestring, runningversion, latestversion)\n\n"
-          "REQUIRED INPUT - CHOOSE ONE:\n"
-          "-c --configpath   Path where Configuration File is Stored. MUST HAVE R.\n"
-          "OPTIONAL INPUT:\n"          
+          "OPTIONAL INPUT:\n"
+          "-c --configpath    Path where Configuration File is Stored. Default: Directory this ran in. MUST HAVE WRITE PERMISSIONS.\n"
           "-s --section       Section Name for configuration. This allows for multiple instances to be ran from same configuration.\n")
 def main(argv):
     configPath, fileName = os.path.split(os.path.realpath(__file__))
@@ -332,7 +344,7 @@ def main(argv):
     for opt, arg in opts:
         if opt in ("-h", "--help"):
             argumenthelp()
-            sys.exit()
+            sys.exit(2)
         elif opt in ("-c", "--configpath"):
             configPath = arg
         elif opt in ("-s", "--section"):

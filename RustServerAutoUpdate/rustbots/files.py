@@ -59,7 +59,7 @@ class SetupLogging:
             else:
                 return newLevel
         else:
-            self.logger.error('Incorrect Log Level Specified. Must be string NOTSET,DEBUG,INFO,WARNING,ERROR,CRITICAL or integer', stack_info=False)
+            self.logger.error('Incorrect Log Level Specified. (' + level + ') Must be string NOTSET,DEBUG,INFO,WARNING,ERROR,CRITICAL or integer', stack_info=False)
             return -1
 
 class ManageFiles:

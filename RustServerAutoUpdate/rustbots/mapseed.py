@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import sys, getopt, re, configparser, random, os.path, glob, logging
-from os import remove
-from shutil import copy2
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 
@@ -34,7 +32,7 @@ class MapSeedBot:
            last wipe will be current time. Pass newSeed to be written to seed INI file
            Will set self.lastWipe to what was read from INI or what was just written"""
         configPath = self.configPath
-        configName = self.configName
+        configName = self.configName + '-seed.ini'
         configSection = self.configSection
         timeZN = timezone(timedelta(hours=0))
         wipeDateTime = datetime.now(timeZN)
@@ -75,7 +73,7 @@ class MapSeedBot:
 
             #Backup seed log if possible then write the configuration.
             if not (self.fileManage is None):
-                self.fileManage.backup_file(configPath, configName, 1)
+                self.fileManage.backup_file(configFile, '', 1)
             with open(configFile, 'w', encoding='utf-8') as configfile:
                 config.write(configfile)
         self.config = configparser.ConfigParser(delimiters=('='))
@@ -85,6 +83,7 @@ class MapSeedBot:
         self.lastWipe = confsec['last_wipe']
 
     def change_seed(self, newSeed):
+        """Backs up configuration file, if possible, and writes new seed"""
         linelist = list
 
         #Backup configuration if possible.
@@ -108,6 +107,9 @@ class MapSeedBot:
                 configfilewrite.write('seed="'+str(newSeed)+'" # default random; range : 1 to 2147483647 ; used to change or reproduce a procedural map')
              
     def wipe_check(self):
+        """Check date to see if this is the first Thursday of the Month.
+           If so. Change seed and return new seed and date.
+           Returnes tuple (Bool Seed Changed, String Message, String Last Wipe Time)"""
         timeZN = timezone(timedelta(hours=0))
         tm = datetime.now(timeZN).timetuple()
         if tm.tm_mday <= 7 and tm.tm_wday == 3:

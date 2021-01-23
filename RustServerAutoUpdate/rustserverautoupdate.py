@@ -23,12 +23,18 @@ class RustMonitor:
         configSectionUpper = configSection.upper()
         self.setup_configuration(configPath, configName, configSectionUpper)
         confsec = self.config[configSectionUpper]
+        
+        self.configPath = configPath
+        self.configName = configName
+        self.configSection = configSectionUpper
 
         #Assign variables to all data read from Configuration file.
         self.oxideLogDIR = confsec['oxide_log_dir']
         self.oxideGitURL = confsec['oxide_git_url']
         self.oxideCheckTime = self.config.getfloat(configSectionUpper, 'oxide_check_time_in_min')
         self.oxideAutoUpdate = self.config.getboolean(configSectionUpper, 'oxide_auto_update')
+        self.monthlySeedChange = self.config.getboolean(configSectionUpper, 'monthly_seed_change')
+        self.seedConfigPath = confsec['seed_config_path']
         self.bashCommand = confsec['bash_get_update_command']
         self.useRCON =  self.config.getboolean(configSectionUpper, 'use_rcon')
         self.useDiscord =  self.config.getboolean(configSectionUpper, 'use_discord')
@@ -67,6 +73,8 @@ class RustMonitor:
                                                 'oxide_git_url': 'https://api.github.com/repositories/94599577/releases/latest',
                                                 'oxide_check_time_in_min': '15',
                                                 'oxide_auto_update': 'yes',
+                                                'monthly_seed_change': 'yes',
+                                                'seed_config_path': '/home/rustserver/lgsm/config-lgsm/rustserver/rustserver.cfg',
                                                 'bash_get_update_command': '/home/rustserver/./rustserver stop;/home/rustserver/./rustserver update;/home/rustserver/./rustserver mods-update;/home/rustserver/./rustserver start',
                                                 'use_rcon': 'yes',
                                                 'use_discord': 'no',
@@ -131,6 +139,11 @@ class RustMonitor:
     def check_variables(self, case):
         """Check variables to confirm they will not cause errors.
            Fill in generic defaults if non-required variables are empty."""
+        if case == 0:
+            if not self.seedConfigPath.strip():
+                raise RustMonitorVariableError('seed_config_path', 'Seed Update is enabled, but no path to seed config was provided.')
+            elif not os.path.exists(self.seedConfigPath):
+                raise RustMonitorVariableError('seed_config_path', 'Seed Update is enabled, but configuration was not found at {0}'.format(self.seedConfigPath))
         if case == 1:
             if not self.discordWebHook.strip():
                 raise RustMonitorVariableError('discord_webhook', 'Discord Bot is enabled, but no webHook was provided.')
@@ -185,9 +198,16 @@ class RustMonitor:
                 self.logger.exception('Error Sending Kick / Save Command via RCON: {0}'.format(ex))
 
     def wipe_check(self):
-        #TODO: Moved to separate class. Add check here and trigger restart etc if seed is updated.
-        #Possibly do not trigger restart and wait for server to update.
-        return
+        """Checks to see if a new seed should be written. If seed updated, message users"""
+        try:
+            updated, response, date = self.seedBot.wipe_check()
+            if updated:
+                self.send_msgs("This is the first Thursday of the Month. Map updated with new seed {0}. Map will be wiped on next reboot".format(response))
+                self.logger.info("This is the first Thursday of the Month. Map will be updated with new seed {0}. Map will be wiped on next reboot".format(response))
+            else:
+                self.logger.debug("{0} Last Wipe: {1}".format(response, date))
+        except Exception as ex:
+            self.logger.exception('Error Checking Monthly Wipes {0}'.format(ex))
 
     def oxide_check(self):
         try:
@@ -216,48 +236,48 @@ class RustMonitor:
             if ((datetime.now(timeZN) >= (loopStartTime + loopCycleTime)) or loopStart) and not updateNeeded:
                 # Check for update on each loop
                 with ThreadPoolExecutor() as executor:
+                        if self.monthlySeedChange: await self.loop.run_in_executor(executor, self.wipe_check)
                         updateNeeded = await self.loop.run_in_executor(executor, self.oxide_check)
-
                 loopStartTime = datetime.now(timeZN)
                 messageWaitTime = timedelta(minutes=0)
             if updateNeeded and not loopStart:
                 if send15 and (datetime.now(timeZN) >= (loopStartTime + messageWaitTime)):
-                    print("Sending 15 Minute Warning")
+                    self.logger.debug("Sending 15 Min Message: " + self.msg15Min)
                     with ThreadPoolExecutor() as executor:
                         await self.loop.run_in_executor(executor, self.send_msgs, self.msg15Min)
                     send15 = False
                     loopStartTime = datetime.now(timeZN)
                     messageWaitTime = timedelta(minutes=15)
                 elif send10 and (datetime.now(timeZN) >= (loopStartTime + (messageWaitTime - timedelta(minutes=10)))):
-                    print("Sending 10 Minute Warning")
+                    self.logger.debug("Sending 10 Min Message: " + self.msg10Min)
                     with ThreadPoolExecutor() as executor:
                         await self.loop.run_in_executor(executor, self.send_msgs,self.msg10Min)
                     send10 = False
                     loopStartTime = datetime.now(timeZN)
                     messageWaitTime = timedelta(minutes=10)
                 elif send05 and (datetime.now(timeZN)  >= (loopStartTime + (messageWaitTime - timedelta(minutes=5)))):
-                    print("Sending 5 Minute Warning")
+                    self.logger.debug("Sending 5 Min Message: " + self.msg05Min)
                     with ThreadPoolExecutor() as executor:
                         await self.loop.run_in_executor(executor, self.send_msgs, self.msg05Min)
                     send05 = False
                     loopStartTime = datetime.now(timeZN)
                     messageWaitTime = timedelta(minutes=5)
                 elif send01 and (datetime.now(timeZN)  >= (loopStartTime + (messageWaitTime - timedelta(minutes=1)))):
-                    print("Sending 1 Minute Warning")
+                    self.logger.debug("Sending 1 Min Message: " + self.msg01Min)
                     with ThreadPoolExecutor() as executor:
                         await self.loop.run_in_executor(executor, self.send_msgs, self.msg01Min)
                     send01 = False
                     loopStartTime = datetime.now(timeZN)
                     messageWaitTime = timedelta(minutes=1)
                 elif autoUpdate and (datetime.now(timeZN) >= (loopStartTime + messageWaitTime)) and not (send01 or send05 or send10 or send15):
-                    print("Updating Oxide")
+                    self.logger.info("Updating Oxide")
                     with ThreadPoolExecutor() as executor:
                         print(self.bashCommand)
                         await self.loop.run_in_executor(executor, self.kick_save)
                         await self.loop.run_in_executor(executor, partial(run, self.bashCommand, shell=True, universal_newlines=True))                    
                     autoUpdate = False
                 elif not (send01 or send05 or send10 or send15 or autoUpdate):
-                    print("Reset Update Check")
+                    self.logger.debug("Update Cycle Complete. Loop will restart checks in {0} minutes".format(int(self.oxideCheckTime) + 20))
                     updateNeeded = False
                     #Using LinuxGSM the shell will return and the game starts up in a separate thread. Need to wait for the game to start so that the logs load.
                     #Could probably do this a different way, but for now, I think this is the best option. 
@@ -288,21 +308,27 @@ class RustMonitor:
             await asyncio.sleep(1)
 
     def main(self):
-        if not self.oxideAutoUpdate and not self.useDiscord and not self.useRCON:
-            raise RustMonitorVariableError('oxide_auto_update', 'Oxide Auto Update, Discord, and RCON are all disabled. There is nothing for this program to do.')
-        if self.useDiscord:
-            self.check_variables(1)
-            self.serverinfo = discord.ServerInformation(self.discordMsgGameName, self.discordMsgServerName, self.discordMsgServerIP, self.discordMsgHostName)
-            self.discordBot = discord.DiscordBot(self.discordWebHook, self.discordBotName, self.discordBotAvatarURL)
-        if self.useRCON:
-            self.rconBotName = self.discordBotName
-            self.check_variables(2)
-            self.rconBot = rcon.RCONBot(self.rconPass, self.rconIP, self.rconPort, self.rconBotName)
-        self.oxideBot = oxide.UpdateCheck(self.oxideLogDIR, self.oxideGitURL)
-        self.loop = asyncio.get_event_loop()
-        tasks = asyncio.gather(self.update_loop())
         try:
+            if not self.oxideAutoUpdate and not self.useDiscord and not self.useRCON:
+                raise RustMonitorVariableError('oxide_auto_update', 'Oxide Auto Update, Discord, and RCON are all disabled. There is nothing for this program to do.')
+            if self.monthlySeedChange:
+                self.check_variables(0)
+                self.seedBot = mapseed.MapSeedBot(self.configPath, self.configName + '.log', self.seedConfigPath, self.configSection)
+            if self.useDiscord:
+                self.check_variables(1)
+                self.serverinfo = discord.ServerInformation(self.discordMsgGameName, self.discordMsgServerName, self.discordMsgServerIP, self.discordMsgHostName)
+                self.discordBot = discord.DiscordBot(self.discordWebHook, self.discordBotName, self.discordBotAvatarURL)
+            if self.useRCON:
+                self.rconBotName = self.discordBotName
+                self.check_variables(2)
+                self.rconBot = rcon.RCONBot(self.rconPass, self.rconIP, self.rconPort, self.rconBotName)
+            self.oxideBot = oxide.UpdateCheck(self.oxideLogDIR, self.oxideGitURL)            
+            self.loop = asyncio.get_event_loop()
+            tasks = asyncio.gather(self.update_loop())
             self.loop.run_until_complete(tasks)
+        except RustMonitorVariableError as ex:
+            self.logger.error("Please Check Configuration. Error with Setting: ({0}) Message: {1}".format(ex.variable, ex.msg))
+            sys.exit(0)
         except GracefulExit:
             self.stop = True
             tasks.add_done_callback(lambda t: self.loop.stop())
@@ -320,7 +346,8 @@ class GracefulExit(Exception):
     pass
 
 def signal_handler(signum, frame):
-    print("\nStopping Rust Server Auto Update")
+    logger = logging.getLogger(__name__)
+    logger.info("Detected User Signal to Stop. Attempting to Gracefully Stop Rust Server Auto Update")
     raise GracefulExit()
 
 def argumenthelp():

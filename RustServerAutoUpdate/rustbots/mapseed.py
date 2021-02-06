@@ -35,7 +35,7 @@ class MapSeedBot:
         configName = self.configName + '-seed.ini'
         configSection = self.configSection
         timeZN = timezone(timedelta(hours=0))
-        wipeDateTime = datetime.now(timeZN)
+        wipeDateTime = datetime.now(timeZN).strftime('%Y-%m-%d %H:%M:%S.%f%z')
         confComments = OrderedDict({'DEFAULT': {'# This is the Default section.': None,
                                                 '# This section will only contain the last_wipe key as a fallback.': None,
                                                 '# Individual instances will contain the last wipe and previous seeds.': None},
